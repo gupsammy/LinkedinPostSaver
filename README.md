@@ -21,34 +21,36 @@ A Chrome extension that saves all LinkedIn posts from the current page as a form
 4. Click "Load unpacked" and select the extension folder
 5. The extension should now appear in your Chrome toolbar
 
-### Project Structure
+### Required Files
 
-```
-LinkedinPostSaver/
-├── manifest.json                    # Extension configuration
-├── README.md                        # Documentation
-└── src/                            # Source files
-    ├── background/
-    │   └── background.js           # Service worker for downloads
-    ├── content/
-    │   └── content.js              # Content script for post extraction
-    ├── popup/
-    │   ├── popup.html              # Extension popup interface
-    │   └── popup.js                # Popup functionality
-    └── assets/
-        └── icons/
-            ├── icon16.png          # 16x16 icon
-            ├── icon48.png          # 48x48 icon
-            └── icon128.png         # 128x128 icon
-```
+Make sure your extension folder contains:
+
+- `manifest.json`
+- `background.js`
+- `content.js`
+- `popup.html`
+- `popup.js`
+- Icon files (16x16, 48x48, 128x128 pixels)
 
 ## Usage
+
+### Method 1: Extension Popup
 
 1. **Navigate to LinkedIn**: Open any LinkedIn feed page (home, company page, etc.)
 2. **Click Extension Icon**: Click the LinkedIn Post Saver icon in your Chrome toolbar
 3. **Save Posts**: Click "Save Posts to File" in the popup
 4. **Choose Location**: Select where to save the markdown file
 5. **Done!**: Your posts are now saved as a formatted markdown file
+
+### Method 2: Right-Click Context Menu ⭐ NEW!
+
+1. **Navigate to LinkedIn**: Open any LinkedIn feed page
+2. **Right-Click**: Right-click anywhere on the LinkedIn page
+3. **Select "Save LinkedIn Posts"**: Click the context menu option
+4. **Choose Location**: Select where to save the markdown file
+5. **Done!**: Posts are saved without opening the popup
+
+> **Tip**: The context menu option only appears on LinkedIn pages for a cleaner experience!
 
 ## Output Format
 
@@ -84,21 +86,14 @@ The generated markdown file includes:
 - `activeTab`: Access to the current LinkedIn tab
 - `downloads`: Download generated markdown files
 - `scripting`: Inject content scripts into LinkedIn pages
+- `contextMenus`: Add right-click context menu option
 - `host_permissions`: Access to LinkedIn.com
 
 ### Architecture
 
-- **Content Script** (`src/content/content.js`): Extracts posts from LinkedIn's DOM
-- **Background Service Worker** (`src/background/background.js`): Handles file downloads
-- **Popup Interface** (`src/popup/popup.html` & `popup.js`): User interface for triggering extraction
-- **Assets** (`src/assets/`): Icons and other static resources
-
-#### Project Organization Benefits
-
-- **Modular Structure**: Each functionality is separated into its own directory
-- **Scalability**: Easy to add new features and maintain existing code
-- **Clear Separation**: Background scripts, content scripts, UI, and assets are clearly separated
-- **Professional Layout**: Follows Chrome extension development best practices
+- **Content Script** (`content.js`): Extracts posts from LinkedIn's DOM
+- **Background Service Worker** (`background.js`): Handles file downloads
+- **Popup Interface** (`popup.html/js`): User interface for triggering extraction
 
 ### LinkedIn Post Structure
 
@@ -150,25 +145,9 @@ The extension targets posts within `.fie-impression-container` elements and extr
 ### Building from Source
 
 1. Clone the repository
-2. Install dependencies (optional): `npm install`
-3. Validate the build: `npm run validate`
-4. Load the extension folder in Chrome Developer Mode
-5. Make changes to the source files
-6. Reload the extension in `chrome://extensions/`
-
-### Available Scripts
-
-- `npm run validate` - Validates that all file paths in manifest.json exist
-- `npm run build` - Builds and validates the extension
-- `npm run dev` - Shows development instructions
-- `npm run zip` - Creates a distribution zip file
-
-### Project Structure Benefits
-
-- **Organized Code**: Logical separation of concerns
-- **Easy Maintenance**: Clear file organization makes debugging easier
-- **Scalable**: Easy to add new features without cluttering
-- **Professional**: Follows industry best practices for Chrome extensions
+2. Load the extension folder in Chrome Developer Mode
+3. Make changes to the source files
+4. Reload the extension in `chrome://extensions/`
 
 ### Contributing
 

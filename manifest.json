@@ -3,7 +3,7 @@
   "name": "LinkedIn Post Saver",
   "version": "1.0",
   "description": "Save all LinkedIn posts on the current page as a markdown file",
-  "permissions": ["activeTab", "downloads", "scripting"],
+  "permissions": ["activeTab", "downloads", "scripting", "contextMenus"],
   "host_permissions": ["*://www.linkedin.com/*"],
   "background": {
     "service_worker": "src/background/background.js"

@@ -3,6 +3,24 @@
 // Handle installation
 chrome.runtime.onInstalled.addListener(() => {
   console.log("LinkedIn Post Saver extension installed");
+
+  // Create context menu item
+  chrome.contextMenus.create({
+    id: "saveLinkedInPosts",
+    title: "Save LinkedIn Posts",
+    contexts: ["page"],
+    documentUrlPatterns: ["*://www.linkedin.com/*"],
+  });
+
+  console.log("Context menu created");
+});
+
+// Handle context menu clicks
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId === "saveLinkedInPosts") {
+    console.log("Context menu clicked, starting extraction...");
+    await triggerPostExtraction(tab);
+  }
 });
 
 // Handle download requests
@@ -23,6 +41,60 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // Keep message channel open for async response
   }
 });
+
+// Common function to trigger post extraction (used by both context menu and icon click)
+async function triggerPostExtraction(tab) {
+  try {
+    console.log("Triggering post extraction for tab:", tab.id);
+
+    // Check if we're on LinkedIn
+    if (!tab.url.includes("linkedin.com")) {
+      console.log("Not on LinkedIn page");
+      return;
+    }
+
+    // Try to contact existing content script first
+    let response;
+    try {
+      response = await chrome.tabs.sendMessage(tab.id, { action: "ping" });
+      console.log("Content script already loaded");
+    } catch (error) {
+      console.log("Content script not loaded, injecting it...");
+
+      // Inject content script manually
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ["src/content/content.js"],
+      });
+
+      // Wait for script to initialize
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      console.log("Content script injected");
+    }
+
+    // Extract posts
+    console.log("Sending extract posts message...");
+    response = await chrome.tabs.sendMessage(tab.id, {
+      action: "extractPosts",
+    });
+
+    if (response && response.success) {
+      console.log(`Found ${response.postsCount} posts, starting download...`);
+
+      // Generate filename with current date
+      const timestamp = new Date().toISOString().split("T")[0];
+      const filename = `linkedin-posts-${timestamp}.md`;
+
+      // Download the markdown
+      await downloadMarkdownFile(response.markdown, filename);
+      console.log("Context menu extraction completed successfully");
+    } else {
+      console.error("Failed to extract posts:", response?.error);
+    }
+  } catch (error) {
+    console.error("Failed to trigger extraction:", error);
+  }
+}
 
 // Download markdown content as a file
 async function downloadMarkdownFile(markdownContent, filename) {
@@ -74,43 +146,5 @@ function createDataUrl(content, mimeType = "text/plain") {
 // Handle extension icon click (alternative trigger)
 chrome.action.onClicked.addListener(async (tab) => {
   console.log("Extension icon clicked, tab URL:", tab.url);
-
-  // Check if we're on LinkedIn
-  if (!tab.url.includes("linkedin.com")) {
-    console.log("Not on LinkedIn page");
-    return;
-  }
-
-  try {
-    console.log("Injecting content script via icon click...");
-
-    // Inject content script if not already present and extract posts
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ["src/content/content.js"],
-    });
-
-    // Wait for script to load
-    setTimeout(async () => {
-      try {
-        // Send message to content script to extract posts
-        const response = await chrome.tabs.sendMessage(tab.id, {
-          action: "extractPosts",
-        });
-
-        if (response && response.success) {
-          const timestamp = new Date().toISOString().split("T")[0];
-          const filename = `linkedin-posts-${timestamp}.md`;
-
-          // Download the markdown
-          await downloadMarkdownFile(response.markdown, filename);
-          console.log("Auto-extraction completed via icon click");
-        }
-      } catch (error) {
-        console.error("Failed to auto-extract via icon click:", error);
-      }
-    }, 1000);
-  } catch (error) {
-    console.error("Failed to trigger extraction via icon click:", error);
-  }
+  await triggerPostExtraction(tab);
 });
