@@ -488,6 +488,154 @@ class LinkedInPostExtractor {
     }
   }
 
+  // Extract time ago information from a post
+  extractTimeAgo(postContainer) {
+    try {
+      // The selector provided has ember16278 which might be dynamic, so let's make it more flexible
+      const timeAgoSelectors = [
+        // Original specific selector
+        "#ember16278 > div > div > div.fie-impression-container > div.relative > div.PmmJpOCWkoAkFJmjbmlHzAtDWdYbNtRsPxA.display-flex.align-items-flex-start.update-components-actor--with-control-menu > div > div > span > span:nth-child(1)",
+        // More flexible selectors as fallbacks
+        ".update-components-actor span span:nth-child(1)",
+        ".update-components-actor__meta span:first-child",
+        ".feed-shared-actor__meta span:first-child",
+        ".update-components-actor .visually-hidden + span",
+        'span[aria-hidden="true"]:contains("ago")',
+        'span:contains("hour"):first',
+        'span:contains("day"):first',
+        'span:contains("week"):first',
+        'span:contains("month"):first',
+        'span:contains("year"):first',
+      ];
+
+      for (const selector of timeAgoSelectors) {
+        try {
+          let timeElement;
+          if (selector.includes(":contains(")) {
+            // Handle pseudo-selector for text content
+            const textToFind = selector.match(/:contains\("([^"]+)"\)/)[1];
+            const spans = postContainer.querySelectorAll("span");
+            timeElement = Array.from(spans).find(
+              (span) =>
+                span.textContent
+                  .toLowerCase()
+                  .includes(textToFind.toLowerCase()) &&
+                span.textContent
+                  .trim()
+                  .match(/\d+\s*(minute|hour|day|week|month|year)s?\s*ago/i)
+            );
+          } else {
+            timeElement = postContainer.querySelector(selector);
+          }
+
+          if (timeElement) {
+            const timeText = timeElement.textContent.trim();
+            // Validate that it contains time-related text
+            if (
+              timeText.match(
+                /\d+\s*(minute|hour|day|week|month|year)s?\s*ago/i
+              ) ||
+              timeText.match(/^\d+[mhdwy]$/) ||
+              timeText.includes("ago")
+            ) {
+              console.log(
+                `Found time ago using selector: ${selector} -> ${timeText}`
+              );
+              return timeText;
+            }
+          }
+        } catch (error) {
+          console.log(`Error with time ago selector ${selector}:`, error);
+        }
+      }
+
+      // Additional fallback: look for any element containing time patterns
+      const allSpans = postContainer.querySelectorAll("span");
+      for (const span of allSpans) {
+        const text = span.textContent.trim();
+        if (
+          text.match(/\d+\s*(minute|hour|day|week|month|year)s?\s*ago/i) &&
+          text.length < 20
+        ) {
+          console.log(`Found time ago via pattern match: ${text}`);
+          return text;
+        }
+      }
+
+      return "Unknown time";
+    } catch (error) {
+      console.error("Error extracting time ago:", error);
+      return "Unknown time";
+    }
+  }
+
+  // Extract repost flag from a post
+  extractRepostFlag(postContainer) {
+    try {
+      // The selector provided has ember16343 which might be dynamic, so let's make it more flexible
+      const repostSelectors = [
+        // Original specific selector
+        "#ember16343 > div > div > div.fie-impression-container > div.relative > div.update-components-header.update-components-header--with-control-menu.update-components-header--with-divider.update-components-header--with-image.pt2.t-12.t-black--light.t-normal",
+        // More flexible selectors as fallbacks
+        ".update-components-header.update-components-header--with-control-menu.update-components-header--with-divider",
+        ".update-components-header--with-divider",
+        ".update-components-header.pt2.t-12.t-black--light",
+        ".update-components-reshare-header",
+        ".feed-shared-update-v2__header",
+        // Look for repost/reshare indicators by text content
+        '*:contains("reposted")',
+        '*:contains("shared")',
+        '*:contains("reshared")',
+      ];
+
+      for (const selector of repostSelectors) {
+        try {
+          let element;
+          if (selector.includes(":contains(")) {
+            // Handle pseudo-selector for text content
+            const textToFind = selector.match(/:contains\("([^"]+)"\)/)[1];
+            const allElements = postContainer.querySelectorAll("*");
+            element = Array.from(allElements).find((el) =>
+              el.textContent.toLowerCase().includes(textToFind.toLowerCase())
+            );
+          } else {
+            element = postContainer.querySelector(selector);
+          }
+
+          if (element) {
+            console.log(`Found repost indicator using selector: ${selector}`);
+            return 1; // Post is a repost
+          }
+        } catch (error) {
+          console.log(`Error with repost selector ${selector}:`, error);
+        }
+      }
+
+      // Additional check: look for common repost text patterns
+      const textContent = postContainer.textContent.toLowerCase();
+      const repostPatterns = [
+        "reposted this",
+        "shared this",
+        "reshared this",
+        "reposted by",
+        "shared by",
+        "originally posted by",
+      ];
+
+      for (const pattern of repostPatterns) {
+        if (textContent.includes(pattern)) {
+          console.log(`Found repost via text pattern: ${pattern}`);
+          return 1; // Post is a repost
+        }
+      }
+
+      return 0; // Post is not a repost
+    } catch (error) {
+      console.error("Error extracting repost flag:", error);
+      return 0; // Default to not a repost on error
+    }
+  }
+
   // Extract a single post's content
   extractPostContent(postContainer) {
     // LinkedIn's new structure: find the commentary section
@@ -515,6 +663,10 @@ class LinkedInPostExtractor {
     const reactionsCount = this.extractReactionsCount(postContainer);
     const commentsCount = this.extractCommentsCount(postContainer);
 
+    // Extract new fields
+    const timeAgo = this.extractTimeAgo(postContainer);
+    const repostFlag = this.extractRepostFlag(postContainer);
+
     if (!content.trim()) {
       console.log("Content is empty after processing");
       return null;
@@ -526,6 +678,8 @@ class LinkedInPostExtractor {
       content: content.trim(),
       reactionsCount,
       commentsCount,
+      timeAgo,
+      repostFlag,
     };
   }
 
@@ -573,6 +727,8 @@ class LinkedInPostExtractor {
             authorName: postData.author?.name,
             contentLength: postData.content.length,
             timestamp: postData.timestamp,
+            timeAgo: postData.timeAgo,
+            isRepost: postData.repostFlag === 1,
             reactionsCount: postData.reactionsCount,
             commentsCount: postData.commentsCount,
           });
@@ -613,6 +769,14 @@ class LinkedInPostExtractor {
       if (post.timestamp) {
         markdown += `**Posted:** ${post.timestamp}\n`;
       }
+
+      // Add time ago information
+      if (post.timeAgo) {
+        markdown += `**Time Ago:** ${post.timeAgo}\n`;
+      }
+
+      // Add repost flag
+      markdown += `**Is Repost:** ${post.repostFlag === 1 ? "Yes" : "No"}\n`;
 
       // Add engagement metrics
       markdown += `**Reactions:** ${post.reactionsCount || "0"}\n`;
