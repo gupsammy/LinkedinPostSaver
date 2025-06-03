@@ -119,7 +119,7 @@ class LinkedInPostExtractor {
     });
 
     // Shorter wait for scroll to complete
-    await this.sleep(400);
+    await this.sleep(100);
   }
 
   // Check if we can scroll further down
@@ -396,16 +396,88 @@ class LinkedInPostExtractor {
 
   // Extract author information from a post
   extractAuthorInfo(postElement) {
-    // Try to find author name and profile link
+    // Extract author name using the provided specific selector and fallbacks
+    const authorNameSelectors = [
+      // Specific selector provided by user (making it more flexible by removing specific ember ID)
+      "div.fie-impression-container div.relative div.PmmJpOCWkoAkFJmjbmlHzAtDWdYbNtRsPxA.display-flex.align-items-flex-start.update-components-actor--with-control-menu div div a span.update-components-actor__title span.wXjhKTWXFJWFzxqYGEUMRicMCLRXJk.hoverable-link-text.t-14.t-bold.text-body-medium-bold.white-space-nowrap.t-black.update-components-actor__single-line-truncate span span:nth-child(1)",
+      // More flexible fallbacks
+      ".update-components-actor__title span span:nth-child(1)",
+      ".update-components-actor__title span span:first-child",
+      ".update-components-actor__title .hoverable-link-text span:first-child",
+      ".update-components-actor__single-line-truncate span span:first-child",
+    ];
+
+    // Extract author description using the provided specific selector and fallbacks
+    const authorDescriptionSelectors = [
+      // Specific selector provided by user (making it more flexible by removing specific ember ID)
+      "div.fie-impression-container div.relative div.PmmJpOCWkoAkFJmjbmlHzAtDWdYbNtRsPxA.display-flex.align-items-flex-start.update-components-actor--with-control-menu div div a span.update-components-actor__description.text-body-xsmall.t-black--light span:nth-child(1)",
+      // More flexible fallbacks
+      ".update-components-actor__description span:nth-child(1)",
+      ".update-components-actor__description span:first-child",
+      ".update-components-actor__description.text-body-xsmall span:first-child",
+    ];
+
+    let authorName = null;
+    let authorDescription = null;
+    let profileUrl = null;
+
+    // Extract author name
+    for (const selector of authorNameSelectors) {
+      try {
+        const nameElement = postElement.querySelector(selector);
+        if (nameElement && nameElement.textContent.trim()) {
+          authorName = nameElement.textContent.trim();
+          console.log(
+            `Found author name using selector: ${selector} -> ${authorName}`
+          );
+          break;
+        }
+      } catch (error) {
+        console.log(`Error with author name selector ${selector}:`, error);
+      }
+    }
+
+    // Extract author description
+    for (const selector of authorDescriptionSelectors) {
+      try {
+        const descElement = postElement.querySelector(selector);
+        if (descElement && descElement.textContent.trim()) {
+          authorDescription = descElement.textContent.trim();
+          console.log(
+            `Found author description using selector: ${selector} -> ${authorDescription}`
+          );
+          break;
+        }
+      } catch (error) {
+        console.log(
+          `Error with author description selector ${selector}:`,
+          error
+        );
+      }
+    }
+
+    // Try to find profile link (existing logic)
     const authorLink = postElement.querySelector('a[href*="/in/"]');
     if (authorLink) {
+      profileUrl = authorLink.href.startsWith("http")
+        ? authorLink.href
+        : `https://www.linkedin.com${authorLink.href}`;
+
+      // If we didn't find name through specific selectors, try the link text as fallback
+      if (!authorName) {
+        authorName = authorLink.textContent.trim();
+      }
+    }
+
+    // Return author info if we found at least a name
+    if (authorName) {
       return {
-        name: authorLink.textContent.trim(),
-        profileUrl: authorLink.href.startsWith("http")
-          ? authorLink.href
-          : `https://www.linkedin.com${authorLink.href}`,
+        name: authorName,
+        description: authorDescription || null,
+        profileUrl: profileUrl || null,
       };
     }
+
     return null;
   }
 
@@ -869,6 +941,7 @@ class LinkedInPostExtractor {
         if (postData) {
           console.log(`Post ${index + 1} - Successfully extracted:`, {
             authorName: postData.author?.name,
+            authorDescription: postData.author?.description,
             contentLength: postData.content.length,
             timestamp: postData.timestamp,
             timeAgo: postData.timeAgo,
@@ -909,6 +982,9 @@ class LinkedInPostExtractor {
 
       if (post.author) {
         markdown += `**Author:** [${post.author.name}](${post.author.profileUrl})\n`;
+        if (post.author.description) {
+          markdown += `**Author Description:** ${post.author.description}\n`;
+        }
       }
 
       if (post.timestamp) {
