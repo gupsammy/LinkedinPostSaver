@@ -636,6 +636,148 @@ class LinkedInPostExtractor {
     }
   }
 
+  // Extract media type from a post (Image, Video, or None)
+  extractMediaType(postContainer) {
+    try {
+      // Check for images first
+      const imageSelectors = [
+        // Original specific selector
+        "#ember559 > div > div > div.fie-impression-container > div.update-components-image.update-components-image--single-image.feed-shared-update-v2__content",
+        // More flexible selectors as fallbacks
+        ".update-components-image.update-components-image--single-image",
+        ".update-components-image",
+        ".feed-shared-update-v2__content .update-components-image",
+        ".feed-shared-image",
+        ".shared-image",
+        ".update-components-image--single-image",
+        ".update-components-image--multiple-images",
+        ".feed-shared-update-v2__content img",
+        ".update-components-image img",
+        // Carousel and gallery images
+        ".update-components-image--carousel",
+        ".update-components-image--gallery",
+        ".carousel-image",
+        ".image-carousel",
+        // Generic image indicators
+        '[data-test-id*="image"]',
+        '[class*="image"][class*="update"]',
+        // Document previews that might contain images
+        ".document-preview img",
+        ".feed-shared-article img",
+      ];
+
+      for (const selector of imageSelectors) {
+        try {
+          const imageElement = postContainer.querySelector(selector);
+          if (imageElement) {
+            console.log(`Found image using selector: ${selector}`);
+            return "Image";
+          }
+        } catch (error) {
+          console.log(`Error with image selector ${selector}:`, error);
+        }
+      }
+
+      // Check for videos
+      const videoSelectors = [
+        // Original specific selector
+        "#ember991 > div > div > div.fie-impression-container > div.update-components-linkedin-video.feed-shared-update-v2__content",
+        // More flexible selectors as fallbacks
+        ".update-components-linkedin-video",
+        ".update-components-video",
+        ".feed-shared-update-v2__content .update-components-linkedin-video",
+        ".feed-shared-video",
+        ".shared-video",
+        ".linkedin-video",
+        ".feed-shared-update-v2__content video",
+        ".update-components-video video",
+        // Live video and native video
+        ".live-video",
+        ".native-video",
+        ".linkedin-video-native",
+        // Generic video indicators
+        '[data-test-id*="video"]',
+        '[class*="video"][class*="update"]',
+        "video",
+        ".video-player",
+        ".linkedin-video-player",
+        // Video thumbnails and previews
+        ".video-thumbnail",
+        ".video-preview",
+      ];
+
+      for (const selector of videoSelectors) {
+        try {
+          const videoElement = postContainer.querySelector(selector);
+          if (videoElement) {
+            console.log(`Found video using selector: ${selector}`);
+            return "Video";
+          }
+        } catch (error) {
+          console.log(`Error with video selector ${selector}:`, error);
+        }
+      }
+
+      // Additional checks for media indicators in text or attributes
+      const allElements = postContainer.querySelectorAll("*");
+      for (const element of allElements) {
+        // Check for video-specific attributes or classes
+        if (
+          element.hasAttribute("data-video-id") ||
+          element.hasAttribute("data-video-url") ||
+          element.hasAttribute("data-video-src") ||
+          element.className.includes("video") ||
+          element.tagName.toLowerCase() === "video"
+        ) {
+          console.log("Found video via attribute/tag check");
+          return "Video";
+        }
+
+        // Check for image-specific attributes or classes
+        if (
+          element.hasAttribute("data-image-id") ||
+          element.hasAttribute("data-image-url") ||
+          element.hasAttribute("data-image-src") ||
+          (element.className.includes("image") &&
+            element.className.includes("update")) ||
+          element.tagName.toLowerCase() === "img"
+        ) {
+          console.log("Found image via attribute/tag check");
+          return "Image";
+        }
+      }
+
+      // Check for media-related text indicators in aria-labels or alt text
+      const elementsWithLabels = postContainer.querySelectorAll(
+        "[aria-label], [alt]"
+      );
+      for (const element of elementsWithLabels) {
+        const label = (
+          element.getAttribute("aria-label") ||
+          element.getAttribute("alt") ||
+          ""
+        ).toLowerCase();
+        if (label.includes("video") || label.includes("play")) {
+          console.log("Found video via aria-label/alt text");
+          return "Video";
+        }
+        if (
+          label.includes("image") ||
+          label.includes("photo") ||
+          label.includes("picture")
+        ) {
+          console.log("Found image via aria-label/alt text");
+          return "Image";
+        }
+      }
+
+      return "None";
+    } catch (error) {
+      console.error("Error extracting media type:", error);
+      return "None";
+    }
+  }
+
   // Extract a single post's content
   extractPostContent(postContainer) {
     // LinkedIn's new structure: find the commentary section
@@ -663,9 +805,10 @@ class LinkedInPostExtractor {
     const reactionsCount = this.extractReactionsCount(postContainer);
     const commentsCount = this.extractCommentsCount(postContainer);
 
-    // Extract new fields
+    // Extract additional metadata
     const timeAgo = this.extractTimeAgo(postContainer);
     const repostFlag = this.extractRepostFlag(postContainer);
+    const mediaType = this.extractMediaType(postContainer);
 
     if (!content.trim()) {
       console.log("Content is empty after processing");
@@ -680,6 +823,7 @@ class LinkedInPostExtractor {
       commentsCount,
       timeAgo,
       repostFlag,
+      mediaType,
     };
   }
 
@@ -729,6 +873,7 @@ class LinkedInPostExtractor {
             timestamp: postData.timestamp,
             timeAgo: postData.timeAgo,
             isRepost: postData.repostFlag === 1,
+            mediaType: postData.mediaType,
             reactionsCount: postData.reactionsCount,
             commentsCount: postData.commentsCount,
           });
@@ -777,6 +922,9 @@ class LinkedInPostExtractor {
 
       // Add repost flag
       markdown += `**Is Repost:** ${post.repostFlag === 1 ? "Yes" : "No"}\n`;
+
+      // Add media type
+      markdown += `**Media Type:** ${post.mediaType || "None"}\n`;
 
       // Add engagement metrics
       markdown += `**Reactions:** ${post.reactionsCount || "0"}\n`;
