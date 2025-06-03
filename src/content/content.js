@@ -732,10 +732,13 @@ class LinkedInPostExtractor {
         return "None";
       }
 
-      // Look for update-components-* elements within the media container
-      const allElements = mediaContainer.querySelectorAll("*");
+      // Check the media container itself first, then its children
+      const elementsToCheck = [
+        mediaContainer,
+        ...mediaContainer.querySelectorAll("*"),
+      ];
 
-      for (const element of allElements) {
+      for (const element of elementsToCheck) {
         const classList = element.className;
         if (!classList || typeof classList !== "string") continue;
 
