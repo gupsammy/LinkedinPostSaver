@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <style>
       body {
-        width: 300px;
+        width: 320px;
         padding: 20px;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
           sans-serif;
@@ -88,6 +88,26 @@
         line-height: 1.4;
       }
 
+      .feature-highlight {
+        background-color: #f8f9ff;
+        border: 1px solid #e1e6ff;
+        border-radius: 4px;
+        padding: 10px;
+        margin-bottom: 15px;
+        font-size: 12px;
+        color: #4a5568;
+      }
+
+      .feature-highlight .new-badge {
+        background-color: #0077b5;
+        color: white;
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 3px;
+        margin-right: 8px;
+        font-weight: 600;
+      }
+
       .spinner {
         display: inline-block;
         width: 16px;
@@ -116,18 +136,35 @@
     </div>
 
     <div class="content">
-      <button id="extractBtn" class="extract-btn">Save Posts to File</button>
+      <div class="feature-highlight">
+        <span class="new-badge">NEW</span>
+        <strong>Auto-Scroll Feature:</strong> Automatically loads ALL posts on
+        the page before saving!
+      </div>
+
+      <button id="extractBtn" class="extract-btn">
+        Save All Posts to File
+      </button>
 
       <div id="status" class="status"></div>
 
       <div class="info">
-        <strong>How to use:</strong><br />
+        <strong>How it works:</strong><br />
         1. Navigate to any LinkedIn feed page<br />
-        2. Click "Save Posts to File"<br />
-        3. Choose where to save the markdown file<br /><br />
+        2. Click "Save All Posts to File"<br />
+        3. Extension will auto-scroll to load all posts<br />
+        4. Click "Show more" buttons automatically<br />
+        5. Extract and download as markdown file<br /><br />
 
-        <strong>Note:</strong> This will save all visible posts on the current
-        page.
+        <strong>Features:</strong><br />
+        • ✅ Auto-scroll to load all posts<br />
+        • ✅ Handles "Show more" buttons<br />
+        • ✅ Real-time progress updates<br />
+        • ✅ Right-click context menu<br />
+        • ✅ Preserves links and formatting<br /><br />
+
+        <strong>Note:</strong> The process may take 15-45 seconds depending on
+        the number of posts to load.
       </div>
     </div>
 

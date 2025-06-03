@@ -1,4 +1,4 @@
-// LinkedIn Post Saver Background Service Worker
+// LinkedIn Post Saver Background Service Worker - Enhanced with Auto-Scroll
 
 // Handle installation
 chrome.runtime.onInstalled.addListener(() => {
@@ -7,7 +7,7 @@ chrome.runtime.onInstalled.addListener(() => {
   // Create context menu item
   chrome.contextMenus.create({
     id: "saveLinkedInPosts",
-    title: "Save LinkedIn Posts",
+    title: "Save LinkedIn Posts (Auto-Scroll)",
     contexts: ["page"],
     documentUrlPatterns: ["*://www.linkedin.com/*"],
   });
@@ -18,12 +18,14 @@ chrome.runtime.onInstalled.addListener(() => {
 // Handle context menu clicks
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === "saveLinkedInPosts") {
-    console.log("Context menu clicked, starting extraction...");
-    await triggerPostExtraction(tab);
+    console.log(
+      "Context menu clicked, starting extraction with auto-scroll..."
+    );
+    await triggerPostExtractionWithAutoScroll(tab);
   }
 });
 
-// Handle download requests
+// Handle download requests and progress updates
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log("Background received message:", request);
 
@@ -40,9 +42,97 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     return true; // Keep message channel open for async response
   }
+
+  // Handle scroll progress updates (no response needed)
+  if (request.action === "scrollProgress") {
+    console.log("Scroll progress:", request.progress);
+    // Progress updates are handled by popup if it's open
+    return false;
+  }
 });
 
-// Common function to trigger post extraction (used by both context menu and icon click)
+// Enhanced function to trigger post extraction with auto-scroll
+async function triggerPostExtractionWithAutoScroll(tab) {
+  try {
+    console.log("Triggering post extraction with auto-scroll for tab:", tab.id);
+
+    // Check if we're on LinkedIn
+    if (!tab.url.includes("linkedin.com")) {
+      console.log("Not on LinkedIn page");
+      return;
+    }
+
+    // Try to contact existing content script first
+    let response;
+    try {
+      response = await chrome.tabs.sendMessage(tab.id, { action: "ping" });
+      console.log("Content script already loaded");
+    } catch (error) {
+      console.log("Content script not loaded, injecting it...");
+
+      // Inject content script manually
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ["src/content/content.js"],
+      });
+
+      // Wait for script to initialize
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      console.log("Content script injected");
+    }
+
+    // Phase 1: Auto-scroll and load all posts
+    console.log("Starting auto-scroll phase...");
+    response = await chrome.tabs.sendMessage(tab.id, {
+      action: "autoScrollAndLoad",
+    });
+
+    if (!response || !response.success) {
+      console.error("Auto-scroll failed:", response?.error);
+      return;
+    }
+
+    console.log(`Auto-scroll completed. Found ${response.totalPosts} posts.`);
+
+    // Phase 2: Extract posts
+    console.log("Starting extraction phase...");
+    response = await chrome.tabs.sendMessage(tab.id, {
+      action: "extractPosts",
+    });
+
+    if (response && response.success) {
+      console.log(
+        `Successfully extracted ${response.postsCount} posts, starting download...`
+      );
+
+      // Generate filename with current date
+      const timestamp = new Date().toISOString().split("T")[0];
+      const filename = `linkedin-posts-${timestamp}.md`;
+
+      // Download the markdown
+      await downloadMarkdownFile(response.markdown, filename);
+      console.log("Context menu extraction completed successfully");
+
+      // Show notification
+      try {
+        await chrome.notifications.create({
+          type: "basic",
+          iconUrl: "src/assets/icons/icon48.png",
+          title: "LinkedIn Posts Saved",
+          message: `Successfully saved ${response.postsCount} posts to ${filename}`,
+        });
+      } catch (notificationError) {
+        console.log("Notification not available:", notificationError);
+      }
+    } else {
+      console.error("Failed to extract posts:", response?.error);
+    }
+  } catch (error) {
+    console.error("Failed to trigger extraction with auto-scroll:", error);
+  }
+}
+
+// Legacy function for backward compatibility (without auto-scroll)
 async function triggerPostExtraction(tab) {
   try {
     console.log("Triggering post extraction for tab:", tab.id);
@@ -143,8 +233,8 @@ function createDataUrl(content, mimeType = "text/plain") {
   }
 }
 
-// Handle extension icon click (alternative trigger)
+// Handle extension icon click (use enhanced auto-scroll version)
 chrome.action.onClicked.addListener(async (tab) => {
   console.log("Extension icon clicked, tab URL:", tab.url);
-  await triggerPostExtraction(tab);
+  await triggerPostExtractionWithAutoScroll(tab);
 });
