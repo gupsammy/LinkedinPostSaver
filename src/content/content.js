@@ -160,6 +160,66 @@ class LinkedInPostExtractor {
     return null;
   }
 
+  // Extract reactions count from a post
+  extractReactionsCount(postContainer) {
+    try {
+      // The selector provided has ember111 which might be dynamic, so let's make it more flexible
+      const reactionsSelectors = [
+        // Original specific selector
+        "#ember111 > div.social-details-social-counts.social-details-social-counts--no-vertical-padding > div > div > ul > li.social-details-social-counts__item.social-details-social-counts__reactions.social-details-social-counts__item--height-two-x.social-details-social-counts__reactions--left-aligned > button > span",
+        // More flexible selectors as fallbacks
+        ".social-details-social-counts__reactions > button > span",
+        ".social-details-social-counts__reactions button span",
+        ".social-details-social-counts__item--reactions button span",
+        'li[class*="reactions"] button span',
+      ];
+
+      for (const selector of reactionsSelectors) {
+        const reactionsElement = postContainer.querySelector(selector);
+        if (reactionsElement) {
+          const text = reactionsElement.textContent.trim();
+          // Extract number from text like "123 reactions" or just "123"
+          const match = text.match(/(\d+(?:,\d+)*)/);
+          return match ? match[1].replace(/,/g, "") : "0";
+        }
+      }
+      return "0";
+    } catch (error) {
+      console.error("Error extracting reactions count:", error);
+      return "0";
+    }
+  }
+
+  // Extract comments count from a post
+  extractCommentsCount(postContainer) {
+    try {
+      // The selector provided has ember111 which might be dynamic, so let's make it more flexible
+      const commentsSelectors = [
+        // Original specific selector
+        "#ember111 > div.social-details-social-counts.social-details-social-counts--no-vertical-padding > div > div > ul > li.display-flex.flex-grow-1.max-full-width > ul > li.social-details-social-counts__item.social-details-social-counts__comments.social-details-social-counts__item--height-two-x.social-details-social-counts__item--right-aligned > button > span",
+        // More flexible selectors as fallbacks
+        ".social-details-social-counts__comments > button > span",
+        ".social-details-social-counts__comments button span",
+        ".social-details-social-counts__item--comments button span",
+        'li[class*="comments"] button span',
+      ];
+
+      for (const selector of commentsSelectors) {
+        const commentsElement = postContainer.querySelector(selector);
+        if (commentsElement) {
+          const text = commentsElement.textContent.trim();
+          // Extract number from text like "45 comments" or just "45"
+          const match = text.match(/(\d+(?:,\d+)*)/);
+          return match ? match[1].replace(/,/g, "") : "0";
+        }
+      }
+      return "0";
+    } catch (error) {
+      console.error("Error extracting comments count:", error);
+      return "0";
+    }
+  }
+
   // Extract a single post's content
   extractPostContent(postContainer) {
     // LinkedIn's new structure: find the commentary section
@@ -183,6 +243,10 @@ class LinkedInPostExtractor {
     const timestamp = this.extractTimestamp(postContainer);
     const content = this.htmlToMarkdown(contentSpan);
 
+    // Extract engagement metrics
+    const reactionsCount = this.extractReactionsCount(postContainer);
+    const commentsCount = this.extractCommentsCount(postContainer);
+
     if (!content.trim()) {
       console.log("Content is empty after processing");
       return null;
@@ -192,6 +256,8 @@ class LinkedInPostExtractor {
       author,
       timestamp,
       content: content.trim(),
+      reactionsCount,
+      commentsCount,
     };
   }
 
@@ -239,6 +305,8 @@ class LinkedInPostExtractor {
             authorName: postData.author?.name,
             contentLength: postData.content.length,
             timestamp: postData.timestamp,
+            reactionsCount: postData.reactionsCount,
+            commentsCount: postData.commentsCount,
           });
           this.posts.push({
             id: index + 1,
@@ -277,6 +345,10 @@ class LinkedInPostExtractor {
       if (post.timestamp) {
         markdown += `**Posted:** ${post.timestamp}\n`;
       }
+
+      // Add engagement metrics
+      markdown += `**Reactions:** ${post.reactionsCount || "0"}\n`;
+      markdown += `**Comments:** ${post.commentsCount || "0"}\n`;
 
       markdown += `\n${post.content}\n\n`;
       markdown += `---\n\n`;
