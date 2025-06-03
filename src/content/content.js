@@ -69,7 +69,7 @@ class LinkedInPostExtractor {
         }
 
         // Safety check to prevent infinite scrolling
-        if (scrollAttempt > 100) {
+        if (scrollAttempt > 500) {
           console.log("Maximum scroll attempts reached for safety");
           break;
         }
