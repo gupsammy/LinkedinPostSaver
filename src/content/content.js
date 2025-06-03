@@ -708,141 +708,173 @@ class LinkedInPostExtractor {
     }
   }
 
-  // Extract media type from a post (Image, Video, or None)
+  // Extract media type from a post (Image, Video, Document, or None)
   extractMediaType(postContainer) {
     try {
-      // Check for images first
-      const imageSelectors = [
-        // Original specific selector
-        "#ember559 > div > div > div.fie-impression-container > div.update-components-image.update-components-image--single-image.feed-shared-update-v2__content",
-        // More flexible selectors as fallbacks
-        ".update-components-image.update-components-image--single-image",
-        ".update-components-image",
-        ".feed-shared-update-v2__content .update-components-image",
-        ".feed-shared-image",
-        ".shared-image",
-        ".update-components-image--single-image",
-        ".update-components-image--multiple-images",
-        ".feed-shared-update-v2__content img",
-        ".update-components-image img",
-        // Carousel and gallery images
-        ".update-components-image--carousel",
-        ".update-components-image--gallery",
-        ".carousel-image",
-        ".image-carousel",
-        // Generic image indicators
-        '[data-test-id*="image"]',
-        '[class*="image"][class*="update"]',
-        // Document previews that might contain images
-        ".document-preview img",
-        ".feed-shared-article img",
+      // First, look for the main content container where media is housed
+      const contentContainers = [
+        ".feed-shared-update-v2__content",
+        ".update-components-content",
+        ".fie-impression-container > div:not(.relative)",
       ];
 
-      for (const selector of imageSelectors) {
-        try {
-          const imageElement = postContainer.querySelector(selector);
-          if (imageElement) {
-            console.log(`Found image using selector: ${selector}`);
+      let mediaContainer = null;
+      for (const containerSelector of contentContainers) {
+        mediaContainer = postContainer.querySelector(containerSelector);
+        if (mediaContainer) {
+          console.log(`Found media container using: ${containerSelector}`);
+          break;
+        }
+      }
+
+      if (!mediaContainer) {
+        console.log("No media container found");
+        return "None";
+      }
+
+      // Look for update-components-* elements within the media container
+      const allElements = mediaContainer.querySelectorAll("*");
+
+      for (const element of allElements) {
+        const classList = element.className;
+        if (!classList || typeof classList !== "string") continue;
+
+        // Use regex to find update-components patterns (improved to handle underscores)
+        const componentMatches = classList.match(/update-components-[^\s]+/g);
+
+        if (componentMatches && componentMatches.length > 0) {
+          for (const match of componentMatches) {
+            console.log(`Found component class: ${match}`);
+
+            // Extract the base component type (improved logic)
+            let componentType = "";
+
+            if (match.includes("update-components-linkedin-video")) {
+              componentType = "linkedin-video";
+            } else if (match.includes("update-components-document")) {
+              componentType = "document";
+            } else if (match.includes("update-components-image")) {
+              componentType = "image";
+            } else if (match.includes("update-components-video")) {
+              componentType = "video";
+            } else if (match.includes("update-components-article")) {
+              componentType = "article";
+            } else if (match.includes("update-components-poll")) {
+              componentType = "poll";
+            } else if (match.includes("update-components-event")) {
+              componentType = "event";
+            } else {
+              // Fallback: extract the first word after update-components-
+              const typeMatch = match.match(/update-components-([^-_\s]+)/);
+              if (typeMatch && typeMatch[1]) {
+                componentType = typeMatch[1].toLowerCase();
+              }
+            }
+
+            if (componentType) {
+              console.log(`Extracted component type: ${componentType}`);
+
+              // Map component types to our media categories
+              switch (componentType) {
+                case "image":
+                  // Further check for specific image types
+                  if (
+                    classList.includes("update-components-image--single-image")
+                  ) {
+                    console.log("Detected: Single Image");
+                    return "Image";
+                  } else if (
+                    classList.includes(
+                      "update-components-image--multiple-images"
+                    ) ||
+                    classList.includes("update-components-image--carousel")
+                  ) {
+                    console.log("Detected: Multiple Images/Carousel");
+                    return "Image";
+                  } else {
+                    console.log("Detected: Generic Image");
+                    return "Image";
+                  }
+
+                case "linkedin-video":
+                case "linkedin":
+                case "video":
+                  console.log("Detected: Video");
+                  return "Video";
+
+                case "document":
+                  console.log("Detected: Document");
+                  return "Document";
+
+                case "article":
+                  console.log("Detected: Article");
+                  return "Article";
+
+                case "poll":
+                  console.log("Detected: Poll");
+                  return "Poll";
+
+                case "event":
+                  console.log("Detected: Event");
+                  return "Event";
+
+                default:
+                  // For future unknown types, return the component type capitalized
+                  console.log(`Detected: Unknown type - ${componentType}`);
+                  return (
+                    componentType.charAt(0).toUpperCase() +
+                    componentType.slice(1)
+                  );
+              }
+            }
+          }
+        }
+      }
+
+      // Additional fallback checks for edge cases
+
+      // Check for video elements or video-related attributes
+      const videoElements = mediaContainer.querySelectorAll(
+        "video, [data-video-id], [data-video-url]"
+      );
+      if (videoElements.length > 0) {
+        console.log("Found video via fallback check");
+        return "Video";
+      }
+
+      // Check for image elements (but be more specific)
+      const imageElements = mediaContainer.querySelectorAll(
+        "img[src], [data-image-id], [data-image-url]"
+      );
+      if (imageElements.length > 0) {
+        // Make sure it's not just a profile picture or icon
+        for (const img of imageElements) {
+          const src = img.getAttribute("src") || "";
+          const alt = img.getAttribute("alt") || "";
+
+          // Skip profile pictures, icons, and UI elements
+          if (
+            !src.includes("profile-displayphoto") &&
+            !src.includes("icon") &&
+            !alt.toLowerCase().includes("profile") &&
+            !img.closest(".update-components-actor")
+          ) {
+            console.log("Found content image via fallback check");
             return "Image";
           }
-        } catch (error) {
-          console.log(`Error with image selector ${selector}:`, error);
         }
       }
 
-      // Check for videos
-      const videoSelectors = [
-        // Original specific selector
-        "#ember991 > div > div > div.fie-impression-container > div.update-components-linkedin-video.feed-shared-update-v2__content",
-        // More flexible selectors as fallbacks
-        ".update-components-linkedin-video",
-        ".update-components-video",
-        ".feed-shared-update-v2__content .update-components-linkedin-video",
-        ".feed-shared-video",
-        ".shared-video",
-        ".linkedin-video",
-        ".feed-shared-update-v2__content video",
-        ".update-components-video video",
-        // Live video and native video
-        ".live-video",
-        ".native-video",
-        ".linkedin-video-native",
-        // Generic video indicators
-        '[data-test-id*="video"]',
-        '[class*="video"][class*="update"]',
-        "video",
-        ".video-player",
-        ".linkedin-video-player",
-        // Video thumbnails and previews
-        ".video-thumbnail",
-        ".video-preview",
-      ];
-
-      for (const selector of videoSelectors) {
-        try {
-          const videoElement = postContainer.querySelector(selector);
-          if (videoElement) {
-            console.log(`Found video using selector: ${selector}`);
-            return "Video";
-          }
-        } catch (error) {
-          console.log(`Error with video selector ${selector}:`, error);
-        }
-      }
-
-      // Additional checks for media indicators in text or attributes
-      const allElements = postContainer.querySelectorAll("*");
-      for (const element of allElements) {
-        // Check for video-specific attributes or classes
-        if (
-          element.hasAttribute("data-video-id") ||
-          element.hasAttribute("data-video-url") ||
-          element.hasAttribute("data-video-src") ||
-          element.className.includes("video") ||
-          element.tagName.toLowerCase() === "video"
-        ) {
-          console.log("Found video via attribute/tag check");
-          return "Video";
-        }
-
-        // Check for image-specific attributes or classes
-        if (
-          element.hasAttribute("data-image-id") ||
-          element.hasAttribute("data-image-url") ||
-          element.hasAttribute("data-image-src") ||
-          (element.className.includes("image") &&
-            element.className.includes("update")) ||
-          element.tagName.toLowerCase() === "img"
-        ) {
-          console.log("Found image via attribute/tag check");
-          return "Image";
-        }
-      }
-
-      // Check for media-related text indicators in aria-labels or alt text
-      const elementsWithLabels = postContainer.querySelectorAll(
-        "[aria-label], [alt]"
+      // Check for document indicators
+      const documentElements = mediaContainer.querySelectorAll(
+        '[data-document-id], .document-preview, [href$=".pdf"]'
       );
-      for (const element of elementsWithLabels) {
-        const label = (
-          element.getAttribute("aria-label") ||
-          element.getAttribute("alt") ||
-          ""
-        ).toLowerCase();
-        if (label.includes("video") || label.includes("play")) {
-          console.log("Found video via aria-label/alt text");
-          return "Video";
-        }
-        if (
-          label.includes("image") ||
-          label.includes("photo") ||
-          label.includes("picture")
-        ) {
-          console.log("Found image via aria-label/alt text");
-          return "Image";
-        }
+      if (documentElements.length > 0) {
+        console.log("Found document via fallback check");
+        return "Document";
       }
 
+      console.log("No media detected - post appears to be text-only");
       return "None";
     } catch (error) {
       console.error("Error extracting media type:", error);
