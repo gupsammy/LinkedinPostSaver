@@ -17,7 +17,7 @@
   "content_scripts": [
     {
       "matches": ["*://www.linkedin.com/*"],
-      "js": ["src/content/content.js"],
+      "js": ["src/content/content-refactored.js"],
       "run_at": "document_end"
     }
   ],
